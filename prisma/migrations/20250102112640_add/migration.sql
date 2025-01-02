@@ -25,6 +25,9 @@ CREATE TYPE "Packaging_hierarchy" AS ENUM ('one_layer', 'two_layer', 'three_laye
 -- CreateEnum
 CREATE TYPE "CodeGenerationRequestStatus" AS ENUM ('requested', 'inprogress', 'completed');
 
+-- CreateEnum
+CREATE TYPE "Status" AS ENUM ('pending', 'complete');
+
 -- CreateTable
 CREATE TABLE "ApiRegistry" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -812,6 +815,37 @@ CREATE TABLE "BatchSignatureLog" (
     CONSTRAINT "BatchSignatureLog_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Aggregation_transaction" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "transaction_id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "product_id" UUID NOT NULL,
+    "batch_id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "aggregation_count" INTEGER NOT NULL DEFAULT 0,
+    "product_gen_id" TEXT NOT NULL,
+    "packagingHierarchy" INTEGER NOT NULL,
+    "producthistory_uuid" UUID NOT NULL,
+    "status" "Status" NOT NULL DEFAULT 'pending',
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) NOT NULL,
+
+    CONSTRAINT "Aggregation_transaction_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Scanned_code" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "transaction_id" UUID NOT NULL,
+    "scanned_0_codes" JSONB[] DEFAULT ARRAY[]::JSONB[],
+    "scanned_1_codes" JSONB[] DEFAULT ARRAY[]::JSONB[],
+    "scanned_2_codes" JSONB[] DEFAULT ARRAY[]::JSONB[],
+    "scanned_3_codes" JSONB[] DEFAULT ARRAY[]::JSONB[],
+    "scanned_5_codes" JSONB[] DEFAULT ARRAY[]::JSONB[],
+
+    CONSTRAINT "Scanned_code_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "ApiRegistry_name_endpoint_method_path_key" ON "ApiRegistry"("name", "endpoint", "method", "path");
 
@@ -912,7 +946,16 @@ CREATE UNIQUE INDEX "product_gtin_key" ON "product"("gtin");
 CREATE UNIQUE INDEX "product_product_id_ndc_gtin_key" ON "product"("product_id", "ndc", "gtin");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_history_packagingHierarchy_key" ON "product_history"("packagingHierarchy");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_history_product_uuid_key" ON "product_history"("product_uuid");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "batch_batch_no_key" ON "batch"("batch_no");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "batch_producthistory_uuid_key" ON "batch"("producthistory_uuid");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "batch_batch_no_producthistory_uuid_location_id_key" ON "batch"("batch_no", "producthistory_uuid", "location_id");
@@ -1198,3 +1241,21 @@ ALTER TABLE "BatchSignatureLog" ADD CONSTRAINT "BatchSignatureLog_batch_id_fkey"
 
 -- AddForeignKey
 ALTER TABLE "BatchSignatureLog" ADD CONSTRAINT "BatchSignatureLog_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aggregation_transaction" ADD CONSTRAINT "Aggregation_transaction_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aggregation_transaction" ADD CONSTRAINT "Aggregation_transaction_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "batch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aggregation_transaction" ADD CONSTRAINT "Aggregation_transaction_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aggregation_transaction" ADD CONSTRAINT "Aggregation_transaction_packagingHierarchy_fkey" FOREIGN KEY ("packagingHierarchy") REFERENCES "product_history"("packagingHierarchy") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Aggregation_transaction" ADD CONSTRAINT "Aggregation_transaction_producthistory_uuid_fkey" FOREIGN KEY ("producthistory_uuid") REFERENCES "batch"("producthistory_uuid") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Scanned_code" ADD CONSTRAINT "Scanned_code_transaction_id_fkey" FOREIGN KEY ("transaction_id") REFERENCES "Aggregation_transaction"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

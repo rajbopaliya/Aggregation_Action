@@ -5,7 +5,7 @@ import aggregationtran from "../controller/aggregationTransactionController.js"
 import verifyAuthentication from "../middleware/authMiddleware.js";
 import getAllProducts from "../controller/productController.js";
 import getBatchesByProductId from "../controller/batchController.js"
-
+import scan from "../controller/codeScanController.js";
 
 // Use the authRouter for all routes starting with "/api/v1/auth"
 router.use("/api/v1/auth", authRouter);
@@ -22,5 +22,5 @@ router.get("/api/v1/batch/:productId",verifyAuthentication, getBatchesByProductI
 router.post("/api/v1/aggregationtransaction/addaggregation",verifyAuthentication,aggregationtran)
 
 
-
+router.post("/api/v1/scan",verifyAuthentication,scan)
 export default router

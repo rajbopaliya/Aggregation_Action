@@ -6,14 +6,13 @@ import pkg from 'jsonwebtoken';
 const {sign} = pkg;
 
 const login = async (request, res) => {
-  const { userId, password, forceFully = false } = request.body;
-  console.log("aa");
+  const { user_id, password, forceFully = false } = request.body;
   
   console.log(request.body);
   
   try {
     // Fetch user by userId
-    const user = await findByUserId(userId);
+    const user = await findByUserId(user_id);
 
     if (!user) {
       handlePrismaError(

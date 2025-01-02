@@ -2,6 +2,8 @@ import { handlePrismaSuccess,handlePrismaError } from "../services/prismaRespons
 import prisma from "../../DB/db.config.js";
 
 const getBatchesByProductId = async (request, res) => {
+  console.log("batch api is running...");
+  
     try {
       const batches = await prisma.batch.findMany({
         where: {

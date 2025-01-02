@@ -5,6 +5,9 @@
         "aggregationtransaction",
         "esign",
         "gtin",
-        "newpassword"
+        "isscanned",
+        "newpassword",
+        "producthistory",
+        "superadmin"
     ]
 }

@@ -526,7 +526,7 @@ model product_history {
   ndc                String?         @default("")
   mrp                Float?          @default(0.0)
   generic_name       String          @default("")
-  packagingHierarchy Int
+  packagingHierarchy Int @unique
   packaging_size     String          @db.VarChar(10)
   sent_to_cloud      Boolean         @default(false)
   productNumber      Int?
@@ -540,7 +540,7 @@ model product_history {
   leaflet            String          @default("")
   registration_no    String          @db.VarChar(50)
   product_image      String          @default("")
-  product_uuid       String          @db.Uuid
+  product_uuid       String          @db.Uuid @unique
   esign_status       esign_status    @default(null)
   created_at         DateTime        @default(now()) @db.Timestamptz(6)
   is_latest          Boolean         @default(true)
@@ -552,13 +552,14 @@ model product_history {
   batch_history      batch_history[]
 
   @@map("product_history")
+  Aggregation_transaction Aggregation_transaction[]
 }
 
 model batch {
   id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   batch_no              String                  @unique
   product_uuid          String                  @db.Uuid
-  producthistory_uuid   String                  @db.Uuid
+  producthistory_uuid   String                  @db.Uuid @unique
   location_id           String                  @db.Uuid
   qty                   Int
   esign_status          esign_status            @default(null)
@@ -576,7 +577,9 @@ model batch {
 
   @@unique([batch_no, producthistory_uuid, location_id])
   @@map("batch")
-  Aggregation_transaction Aggregation_transaction[]
+
+  AggregationTransactionsByProductHistoryUUID  Aggregation_transaction[] @relation(name: "producthistory_uuid")
+  AggregationTransactionsByBatchId  Aggregation_transaction[] @relation(name: "batch_id")
 }
 
 model batch_history {
@@ -905,17 +908,18 @@ model Aggregation_transaction{
   user_id               String         @db.Uuid
   aggregation_count     Int            @default(0)
   product_gen_id        String 
-  packaging_level       Int       
+  packagingHierarchy       Int    
+  producthistory_uuid   String         @db.Uuid
+  status                Status         @default(pending)
   created_at            DateTime       @default(now()) @db.Timestamptz(6)
   updated_at            DateTime       @updatedAt @db.Timestamptz(6)
   product               product        @relation(fields: [product_id],references: [id])
-  Batch                 batch          @relation(fields: [batch_id],references: [id])
+  batchByBatchId        batch          @relation(fields: [batch_id],references: [id], name:"batch_id")
   User                  User           @relation(fields: [user_id],references: [id])
-
+  product_history       product_history   @relation(fields: [packagingHierarchy] , references: [packagingHierarchy])
   Scanned_code Scanned_code[]
-  @@unique([product_id,batch_id,packaging_level])
+  batchByProductHistoryUUID    batch          @relation(fields: [producthistory_uuid], references: [producthistory_uuid],name: "producthistory_uuid")
 }
-
 
 model Scanned_code{
   id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -980,4 +984,9 @@ enum CodeGenerationRequestStatus {
   requested
   inprogress
   completed
+}
+
+enum Status{
+  pending
+  complete
 }

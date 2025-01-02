@@ -2,7 +2,7 @@ import { handlePrismaSuccess,handlePrismaError } from "../services/prismaRespons
 import prisma from "../../DB/db.config.js";
 
 const getAllProducts = async (req, res) => {
-  console.log("product api callll.......");
+  console.log("product api called.......");
   
     const { limit = 25, page = 1, search = '', esign_status = '', product_name = '' } = req.query;
     const offset = (page - 1) * parseInt(limit, 10);    
