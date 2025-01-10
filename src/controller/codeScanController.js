@@ -3,8 +3,7 @@ import { logAudit } from "../utils/auditLog.js";
 const scan = async (req, res) => {
   try {
     
-    const { uniqueCode, productId, batchId, packgelevel, audit_log, packaged, quantity } = req.body;
-    const { auditlog_username, auditlog_userid } = req;
+    const { uniqueCode, productId, batchId, packgelevel, packaged, quantity } = req.body;
     console.log("uniqueCode:", uniqueCode);
     console.log("productId:", productId);
     console.log("BatchId", batchId);
@@ -98,19 +97,10 @@ const scan = async (req, res) => {
       console.log(Scanned);
       console.log("code scanned done", Scanned);
     }
-
-    // if (audit_log?.audit_log) {
-    //   await logAudit({
-    //     performed_action: audit_log.performed_action,
-    //     remarks: audit_log.remarks,
-    //     user_name: auditlog_username,
-    //     user_id: auditlog_userid,
-    //   });
-    // }
-    // quantity--;
-    // if (quantity == 0) {
-    //   packaged--
-    // }
+    quantity--;
+    if (quantity == 0) {
+      packaged--
+    }
     return res.status(200).json({ message: "package_generate_id , Package level ,batch_id valid", quantity, packaged, currentLevel: packgelevel });
   }
   catch (error) {
