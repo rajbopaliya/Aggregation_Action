@@ -577,8 +577,7 @@ model batch {
 
   @@unique([batch_no, producthistory_uuid, location_id])
   @@map("batch")
-
-  AggregationTransactionsByProductHistoryUUID  Aggregation_transaction[] @relation(name: "producthistory_uuid")
+ AggregationTransactionsByProductHistoryUUID  Aggregation_transaction[] @relation(name: "producthistory_uuid")
   AggregationTransactionsByBatchId  Aggregation_transaction[] @relation(name: "batch_id")
 }
 
@@ -899,7 +898,6 @@ model BatchSignatureLog {
   User          User            @relation(fields: [user_id], references: [id])
   batch_history batch_history[]
 }
-
 model Aggregation_transaction{
   id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   transaction_id        String         @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -931,7 +929,6 @@ model Scanned_code{
   scanned_5_codes     Json[]          @default([])
   transaction         Aggregation_transaction     @relation(fields: [transaction_id],references: [id])
 }
-
 enum esign_status {
   rejected
   approved
@@ -985,8 +982,7 @@ enum CodeGenerationRequestStatus {
   inprogress
   completed
 }
-
-enum Status{
+enum Status {
   pending
   complete
 }

@@ -1,15 +1,17 @@
-import { handlePrismaSuccess,handlePrismaError } from "../services/prismaResponseHandler.js";
-import { UserResponseCodes,PasswordPolicy,ResponseCodes } from "../../constant.js";
+import { handlePrismaSuccess, handlePrismaError } from "../services/prismaResponseHandler.js";
+import { UserResponseCodes, PasswordPolicy, ResponseCodes } from "../../constant.js";
 import { decrypt, encrypt } from "../services/encryptDecrypt.js";
+import { logAudit } from '../utils/auditLog.js'
 import prisma from "../../DB/db.config.js";
 import pkg from 'jsonwebtoken';
-const {sign} = pkg;
+import { esign_status } from "@prisma/client";
+const { sign } = pkg;
 
 const login = async (request, res) => {
   const { user_id, password, forceFully = false } = request.body;
-  
+
   console.log(request.body);
-  
+
   try {
     // Fetch user by userId
     const user = await findByUserId(user_id);
@@ -69,8 +71,9 @@ const login = async (request, res) => {
       return;
     }
 
-// Verify password
-    const originalPassword = await decrypt(user.password);    
+    // Verify password
+    console.log(user.password)
+    const originalPassword = await decrypt(user.password);
     if (originalPassword !== password) {
       await prisma.user.update({
         where: { id: user.id },
@@ -85,9 +88,9 @@ const login = async (request, res) => {
         "Invalid username or password",
         UserResponseCodes.USER_PASSWORD_MATCH_ERROR
       );
-      return; 
+      return;
     }
-// Check for expired password
+    // Check for expired password
     if (user.password_expires_on && user.password_expires_on < currentDate) {
       handlePrismaError(
         res,
@@ -99,7 +102,7 @@ const login = async (request, res) => {
     }
 
     const checker = await prisma.superadmin_configuration.findMany();
-// Ensure user is not already logged in
+    // Ensure user is not already logged in
     if (user.jwt_token !== null && !forceFully) {
       handlePrismaError(
         res,
@@ -136,6 +139,14 @@ const login = async (request, res) => {
       }
     });
 
+    if (request.body.audit_logs) {
+      await logAudit({
+        performed_action: "login",
+        remarks: "user logged in",
+        user_name: loginRes.user_name,
+        user_id: loginRes.user_id,
+      });
+    }
     console.log("loginRes", loginRes);
     console.log("login successful");
 
@@ -210,8 +221,8 @@ const logout = async (request, res) => {
   console.log(token);
   console.log(request.headers);
   console.log("logggg");
-  
-  
+
+
   if (!token) {
     return res.status(401).json({ message: "Token missing" });
   }
@@ -219,7 +230,7 @@ const logout = async (request, res) => {
   try {
     // Decode the token to get the user ID
     const decoded = pkg.verify(token, process.env.encryptDecryptKey); // Use your secret key here
-    const userId = decoded.userId;     
+    const userId = decoded.userId;
 
     // Log the extracted user ID
     console.log(userId);
@@ -236,7 +247,7 @@ const logout = async (request, res) => {
 
     handlePrismaSuccess(res, "Logout successful");
     console.log("Logout successful");
-    
+
   } catch (err) {
     console.error("Logout failed", err);
     handlePrismaError(
@@ -248,4 +259,186 @@ const logout = async (request, res) => {
   }
 };
 
-export {login,logout}
+const checkUserActive = (res, user) => {
+  if (!user) {
+    handlePrismaError(
+      res,
+      undefined,
+      "Invalid username or password",
+      UserResponseCodes.USER_NOT_FOUND
+    );
+    return;
+  }
+
+  if (!user.is_active) {
+    handlePrismaError(
+      res,
+      undefined,
+      "User is deleted",
+      UserResponseCodes.USER_DELETED_ERROR
+    );
+  }
+};
+
+const checkUserMaxAttempt = async (res, user, lockTime) => {
+  if (user.failed_login_attempt_count >= PasswordPolicy.MAX_LOGIN_ATTEMPT) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { account_locked_until_at: new Date(lockTime) },
+    });
+    handlePrismaError(
+      res,
+      undefined,
+      `Too many failed login attempts. Please try again later.`,
+      ResponseCodes.TOO_MANY_REQUEST
+    );
+    return;
+  }
+};
+
+const checkUserPassword = async (
+  res,
+  user,
+  originalPassword,
+  password,
+  currentDate
+) => {
+  if (originalPassword !== password) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failed_login_attempt_count: user.failed_login_attempt_count + 1,
+        last_failed_login_at: currentDate,
+      },
+    });
+    handlePrismaError(
+      res,
+      undefined,
+      "Invalid username or password",
+      UserResponseCodes.USER_PASSWORD_MATCH_ERROR
+    );
+  }
+};
+
+const checkPasswordExpire = async (res, user, currentDate) => {
+  if (user.password_expires_on && user.password_expires_on < currentDate) {
+    handlePrismaError(
+      res,
+      undefined,
+      "Password expired, please reset your password",
+      ResponseCodes.UNAUTHORIZED
+    );
+  }
+};
+
+const checkUserAccountLock = async (res, user, currentDate) => {
+  // console.log(user)
+  if (user.account_locked_until_at > currentDate) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failed_login_attempt_count: 0 },
+    });
+    handlePrismaError(
+      res,
+      undefined,
+      `Account is locked until ${user.account_locked_until_at}`,
+      ResponseCodes.ACCOUNT_LOCKED_ERROR
+    );
+    return;
+  }
+};
+
+const securityCheck = async (request, res) => {
+  console.log(request.body)
+  const { userId, password, securityCheck, approveAPIName, approveAPImethod } =
+    request.body;
+  try {
+    const user = await findByUserId(userId);
+    console.log(user)
+    checkUserActive(res, user);
+
+    const currentDate = new Date();
+    const lockTime = new Date().setMinutes(
+      currentDate.getMinutes() + PasswordPolicy.ACCOUNT_lOCK_TIME
+    );
+    checkUserAccountLock(res, user, currentDate);
+    checkUserMaxAttempt(res, user, lockTime);
+
+    const originalPassword = await decrypt(user.password);
+    checkUserPassword(res, user, originalPassword, password, currentDate);
+    checkPasswordExpire(res, user, currentDate);
+
+    if (!securityCheck) {
+      handlePrismaError(
+        res,
+        undefined,
+        "Invalid username or password",
+        UserResponseCodes.USER_PASSWORD_MATCH_ERROR
+      );
+      return;
+    }
+    const audit_logs = { auditlog_username: user.user_name, auditlog_userid: user.user_id, esign_status_id: user.id }
+    const designation = await prisma.designations.findUnique({
+      where: { id: user?.designation_id },
+    });
+    if (!user.designation_id || !designation) {
+      handlePrismaError(
+        res,
+        undefined,
+        "Access denied, no designation found",
+        ResponseCodes.UNAUTHORIZED
+      );
+      return;
+    }
+
+    // Fetch the `ApiRegistry` entries using the correct UUIDs from `api_ids`.
+    const apiIds = await prisma.apiRegistry.findMany({
+      where: {
+        api_id: {
+          in: designation.api_ids, // assuming `api_id` is the corresponding integer field in `ApiRegistry`
+        },
+      },
+    });
+
+    const valueExists = apiIds.some(
+      (api) => api.name === approveAPIName && api.method === approveAPImethod
+    );
+
+    if (!valueExists) {
+      handlePrismaError(
+        res,
+        undefined,
+        `Access denied, ${approveAPIName} API is not found`,
+        ResponseCodes.UNAUTHORIZED
+      );
+      return;
+    }
+
+    if (request?.body?.audit_log?.audit_log) {
+      await logAudit({
+        performed_action: request?.body?.audit_log?.performed_action,
+        remarks: request?.body?.audit_log.remarks,
+        user_name: audit_logs?.auditlog_username,
+        user_id: audit_logs?.auditlog_userid,
+      });
+      console.log("Audit log added successfully");
+    }
+
+    handlePrismaSuccess(res, "Security check successful", {
+      userName: user.user_name,
+      userId: user.user_id,
+      user_id: user.id,
+      success: true
+    });
+  } catch (error) {
+    console.error("Error in login", error);
+    handlePrismaError(
+      res,
+      error,
+      "Invalid username or password",
+      ResponseCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+};
+
+export { login, logout, securityCheck }

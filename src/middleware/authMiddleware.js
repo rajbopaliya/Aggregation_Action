@@ -22,7 +22,7 @@ const verifyAuthentication = async (request, response, next) => {
     // Extract userId from the decoded token and attach it to the request object
     request.id = userId;
     request.userName = userName;
-
+    
     const user = await prisma.user.findUnique({
       where: {
         id: userId,
@@ -48,6 +48,8 @@ const verifyAuthentication = async (request, response, next) => {
           },
         });
         // Proceed to the next middleware or route handler
+        request.auditlog_username = userName;
+        request.auditlog_userid = user.user_id;
         next();
       } else {
         await prisma.user.update({

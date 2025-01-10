@@ -1,11 +1,16 @@
 import { ResponseCodes } from "../../constant.js";
 import prisma from "../../DB/db.config.js";
+import { logAudit } from '../utils/auditLog.js'
 
 const aggregationtran = async (req, res) => {
   try {
-    const { product_id, batch_id } = req.body;
     console.log(req.id);
+      const { product_id, batch_id, esign_status, audit_log } = req.body;
+    const { auditlog_username, auditlog_userid } = req;
+    console.log("aa");
     
+    console.log(auditlog_username);
+
     if (!product_id || !batch_id) {
       return res.status(ResponseCodes.BAD_REQUEST).json({
         message: "Missing required fields: product_id or batch_id",
@@ -38,7 +43,7 @@ const aggregationtran = async (req, res) => {
         packagingHierarchy: true,
       },
     });
-    console.log( "packaging Hierarchy from productHistory" ,productHistory.packagingHierarchy);
+    console.log("packaging Hierarchy from productHistory", productHistory.packagingHierarchy);
 
     // Fetch product history ID for the batch
     const batchDetails = await prisma.batch.findFirst({
@@ -49,22 +54,25 @@ const aggregationtran = async (req, res) => {
         producthistory_uuid: true,
       },
     });
-    console.log("product history uuid from batch",batchDetails.producthistory_uuid);
+    console.log("product history uuid from batch", batchDetails.producthistory_uuid);
 
     // Check for existing aggregation transaction
     const existingAggregation = await prisma.aggregation_transaction.findFirst({
       where: {
-        user_id:req.id
+        user_id: req.id
       },
     });
+console.log(existingAggregation);
 
     if (existingAggregation) {
-      console.log("Aggregation transaction already exists in this user"); 
+      console.log("Aggregation transaction already exists in this user");
       res.status(ResponseCodes.CONFLICT).json({ message: "Aggregation transaction already exists in this user" });
       return;
     }
 
+    console.log("Batch Id :", batch_id)
     // Create a new aggregation transaction
+    console.log(req.id)
     const updateAggregation = await prisma.aggregation_transaction.create({
       data: {
         product_id: product_id,
@@ -73,14 +81,23 @@ const aggregationtran = async (req, res) => {
         product_gen_id: productGeneration.generation_id,
         packagingHierarchy: productHistory.packagingHierarchy,
         producthistory_uuid: batchDetails.producthistory_uuid,
+        esign_status
       },
     });
 
     console.log("Aggregation transaction created:", updateAggregation);
-    return res.status(ResponseCodes.OK).json({
-        message: "Aggregation transaction created successfully",
-        data: updateAggregation,
+    if (audit_log?.audit_log) {
+      await logAudit({
+        performed_action: audit_log.performed_action,
+        remarks: audit_log.remarks,
+        user_name: auditlog_username,
+        user_id: auditlog_userid,
       });
+    }
+    return res.status(ResponseCodes.OK).json({
+      message: "Aggregation transaction created successfully",
+      data: updateAggregation,
+    });
   } catch (error) {
     console.log("Error in aggregationtran:", error);
     return res
@@ -89,4 +106,4 @@ const aggregationtran = async (req, res) => {
   }
 };
 
-export default aggregationtran;
+export default aggregationtran;   
