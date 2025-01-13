@@ -1,9 +1,9 @@
 import prisma from "../../DB/db.config.js";
-import { logAudit } from "../utils/auditLog.js";
-const scan = async (req, res) => {
+
+const scanValidation = async (req, res) => {
   try {
     
-    const { uniqueCode, productId, batchId, packgelevel, packaged, quantity } = req.body;
+    let { uniqueCode, productId, batchId, packgelevel, packaged, quantity } = req.body;
     console.log("uniqueCode:", uniqueCode);
     console.log("productId:", productId);
     console.log("BatchId", batchId);
@@ -109,4 +109,4 @@ const scan = async (req, res) => {
   }
 };
 
-export default scan;
+export default scanValidation;

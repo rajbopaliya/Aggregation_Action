@@ -1,10 +1,9 @@
 import { handlePrismaSuccess, handlePrismaError } from "../services/prismaResponseHandler.js";
 import { UserResponseCodes, PasswordPolicy, ResponseCodes } from "../../constant.js";
-import { decrypt, encrypt } from "../services/encryptDecrypt.js";
+import { decrypt } from "../services/encryptDecrypt.js";
 import { logAudit } from '../utils/auditLog.js'
 import prisma from "../../DB/db.config.js";
 import pkg from 'jsonwebtoken';
-import { esign_status } from "@prisma/client";
 const { sign } = pkg;
 
 const login = async (request, res) => {
@@ -216,11 +215,10 @@ const findByUserId = async (userId) => {
 
 
 const logout = async (request, res) => {
-
-  const token = request.headers.authorization?.split(" ")[1]; // Extract token from Authorization header
+ // Extract token from Authorization header
+  const token = request.headers.authorization?.split(" ")[1];
   console.log(token);
   console.log(request.headers);
-  console.log("logggg");
 
 
   if (!token) {

@@ -5,9 +5,8 @@ import { logAudit } from '../utils/auditLog.js'
 const aggregationtran = async (req, res) => {
   try {
     console.log(req.id);
-      const { product_id, batch_id, esign_status, audit_log } = req.body;
+      let { product_id, batch_id, esign_status, audit_log } = req.body;
     const { auditlog_username, auditlog_userid } = req;
-    console.log("aa");
     
     console.log(auditlog_username);
 

@@ -2,7 +2,7 @@ import express, { urlencoded } from "express";
 import router from "./src/routes/router.js";
 
 const app = express();
-const PORT = 3000;
+const PORT = 8080;
 
 app.use(express.json());
 app.use(urlencoded({ extended: true }))
