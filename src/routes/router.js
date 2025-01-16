@@ -7,7 +7,7 @@ import productRouter from "./productRouter.js";
 import batchRouter from "./batchRouter.js";
 import aggregationTransactionRouter from "./aggregationTransactionRouter.js";
 import scanValidationRouter from "./scanValidationRouter.js";
-
+import reprintRouter from "./reprintRouter.js";
 
 // authRouter
 router.use("/api/v1/auth", authRouter);
@@ -29,4 +29,5 @@ router.use("/api/v1/scanvalidation",verifyAuthentication,scanValidationRouter)
 // dropout 
 router.use("/api/v1/dropout",verifyAuthentication,dropoutRouter)
 
+router.use("/api/v1",verifyAuthentication,reprintRouter);
 export default router

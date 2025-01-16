@@ -1,13 +1,8 @@
-import {
-  handlePrismaSuccess,
-  handlePrismaError,
-} from "../services/prismaResponseHandler.js";
+import {handlePrismaSuccess,handlePrismaError} from "../services/prismaResponseHandler.js";
 import prisma from "../../DB/db.config.js";
 import { ResponseCodes } from "../../constant.js";
 
 const getAllProducts = async (req, res) => {
-  console.log("product api called.......");
-
   const {
     limit = 25,
     page = 1,
@@ -60,10 +55,8 @@ const getAllProducts = async (req, res) => {
       label: `${process.env.URL}${el.label}`,
       leaflet: `${process.env.URL}${el.leaflet}`,
     }));
-    handlePrismaSuccess(res, "Get all products successfully", {
-      products: newProducts,
-      total,
-    });
+    handlePrismaSuccess(res, "Get all products successfully", {products: newProducts,total,});
+    
   } catch (error) {
     console.error("Error while fetching products:", error);
     handlePrismaError(
@@ -91,11 +84,9 @@ const getPackagingHierarchy = async (req, res) => {
     }); // Ensure 'where' clause is used in Prisma query
     if (!product) {
       return handlePrismaError(
-        res,
-        null,
-        "Product not found",
-        ResponseCodes.NOT_FOUND
+        res,null,"Product not found",ResponseCodes.NOT_FOUND
       );
+
     }
     if (product.packagingHierarchy) {
       const packaging_size = {};
@@ -112,6 +103,7 @@ const getPackagingHierarchy = async (req, res) => {
         packaging_size["level3"] = product.thirdLayer;
       }
       packaging_size["level5"] = 1;
+
       // console.log(packaging_size)
       const packaging_size_value = Object.values(packaging_size);
       packaging_size_value.push(1);
@@ -126,8 +118,8 @@ const getPackagingHierarchy = async (req, res) => {
       handlePrismaSuccess(res, "Get successfully", {
         packaged,
         quantity,
-        currenlLevel: currentLevel,
-        totallevel: product.packagingHierarchy,
+        currentLevel: currentLevel,
+        totalLevel: product.packagingHierarchy,
       });
     }
   } catch (error) {
@@ -177,4 +169,5 @@ const getCountryCodeByProductId = async (req, res) => {
     );
   }
 };
+
 export { getPackagingHierarchy, getAllProducts, getCountryCodeByProductId };

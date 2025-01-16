@@ -1,22 +1,25 @@
 import { ResponseCodes } from "../../constant.js";
 import prisma from "../../DB/db.config.js";
+import {dropOutValidattion,dropoutCodesValidation} from "../validation/dropOutValidation.js";
+import { handlePrismaError,handlePrismaSuccess } from "../services/prismaResponseHandler.js";
+
 const dropoutWholeBatch = async (req, res) => {
   try {
-    const { product_id, batch_id, dropout_reason } = req.body;
-    console.log("product id", product_id);
-    console.log("batch id", batch_id);
+    const validation = await dropOutValidattion.validateAsync(req.body)
+    console.log("product id", validation.product_id);
+    console.log("batch id", validation.batch_id);
 
     // Check product id and batch id
-    if (!product_id || !batch_id) {
-      return res.status(ResponseCodes.BAD_REQUEST).json({
-        message: "Missing required fields: product_id or batch_id",
-      });
+    if (!validation.product_id || !validation.batch_id) {
+      return handlePrismaError(
+        res,undefined, "Missing required fields: product_id or batch_id", ResponseCodes.BAD_REQUEST
+      );
     }
 
     // find product id from batch table
     const batchDetails = await prisma.batch.findFirst({
       where: {
-        product_uuid: product_id,
+        product_uuid: validation.product_id,
       },
       select: {
         productHistory: true,
@@ -25,9 +28,10 @@ const dropoutWholeBatch = async (req, res) => {
 
     // check batch id is found or not
     if (!batchDetails || !batchDetails.productHistory) {
-      return res.status(ResponseCodes.NOT_FOUND).json({
-        message: "Batch details or product history not found",
-      });
+      return handlePrismaError(
+        res,undefined, "Batch details or product history not found", ResponseCodes.NOT_FOUND
+      );
+
     }
 
     // destructure product id and packge laval  from batch-> productHistory
@@ -49,9 +53,10 @@ const dropoutWholeBatch = async (req, res) => {
 
     // check product generation id find or not
     if (!productGenerationDetails) {
-      return res
-        .status(ResponseCodes.NOT_FOUND)
-        .json({ message: "Product generation details not found" });
+      return handlePrismaError(
+        res,undefined, "Product generation details not found", ResponseCodes.NOT_FOUND
+      );
+
     }
     // console.log("prodcut generation id ",productGenerationDetails);
 
@@ -74,24 +79,25 @@ const dropoutWholeBatch = async (req, res) => {
       codes.push(`${tableNamePrefix}${value}_codes`);
       await prisma.$queryRawUnsafe(
         `UPDATE "${tableNamePrefix}${value}_codes" 
-         SET is_dropped = false, 
+         SET is_dropped = true, 
              dropout_reason = $1`,
-        dropout_reason
+        validation.dropout_reason
       );
     }
     console.log("Generated Codes:", codes);
 
-    return res.status(ResponseCodes.OK).json({
-      message: "Batch dropout successfully",
-      success: true,
-      code: ResponseCodes.OK,
-    });
+    return handlePrismaSuccess(res, "Batch dropout successfully");
+
   } catch (error) {
+      if(error.isJoi === true){
+        return handlePrismaError(
+          res,undefined, error.details[0].message ,ResponseCodes.INTERNAL_SERVER_ERROR
+        )
+      }
     console.error("Error in dropoutWholeBatch:", error);
-    return res.status(ResponseCodes.INTERNAL_SERVER_ERROR).json({
-      message: "Internal server error",
-      error: error.message,
-    });
+     return handlePrismaError(
+      res,undefined, "Internal server error", ResponseCodes.INTERNAL_SERVER_ERROR
+    );
   }
 };
 
@@ -146,12 +152,7 @@ async function processResults(result, tableNamePrefix, dropout_reason, packaging
   for (const [tableLevel, codes] of Object.entries(result)) {
     let currentTableLevel = parseInt(tableLevel);
 
-    console.log(
-      "Processing table level:",
-      currentTableLevel,
-      "with codes:",
-      codes
-    );
+    console.log("Processing table level:",currentTableLevel,"with codes:",codes);
 
     if (currentTableLevel === 0) {
       await updateCodes(
@@ -201,19 +202,20 @@ async function processResults(result, tableNamePrefix, dropout_reason, packaging
 }
 
 const dropoutCodes = async (req, res) => {
-  try {
-    const { product_id, batch_id, dropoutCodes, dropout_reason } = req.body;
-    console.log("Dropout req body ", req.body);
 
-    if (!product_id || !batch_id) {
-      return res.status(ResponseCodes.BAD_REQUEST).json({
-        message: "Missing required fields: product_id or batch_id",
-      });
+  const validation = await dropoutCodesValidation.validateAsync(req.body);
+  try {
+    // console.log("Dropout req body ", req.body);
+
+    if (!validation.product_id || !validation.batch_id) {
+      return handlePrismaError(
+        res,undefined,"Missing required fields: product_id or batch_id", ResponseCodes.BAD_REQUEST
+      );
     }
 
     const batchDetails = await prisma.batch.findFirst({
       where: {
-        product_uuid: product_id,
+        product_uuid: validation.product_id,
       },
       select: {
         productHistory: true,
@@ -221,9 +223,8 @@ const dropoutCodes = async (req, res) => {
     });
 
     if (!batchDetails || !batchDetails.productHistory) {
-      return res.status(ResponseCodes.NOT_FOUND).json({
-        message: "Batch details or product history not found",
-      });
+      return handlePrismaError(
+        res,undefined, "Batch details or product history not found", ResponseCodes.NOT_FOUND);
     }
 
     const { product_uuid, packagingHierarchy } = batchDetails.productHistory;
@@ -241,9 +242,9 @@ const dropoutCodes = async (req, res) => {
     );
 
     if (!productGenerationDetails) {
-      return res.status(ResponseCodes.NOT_FOUND).json({
-        message: "Product generation details not found",
-      });
+      return handlePrismaError(
+        res,undefined, "Product generation details not found", ResponseCodes.NOT_FOUND
+      );
     }
 
     // Looped hierarchy mapping
@@ -272,7 +273,7 @@ const dropoutCodes = async (req, res) => {
         product_code_length: true,
       },
     });
-    const result = dropoutCodes.reduce((acc, item) => {
+    const result = validation.dropoutCodes.reduce((acc, item) => {
       const n = item.slice(
         superConfig[0].product_code_length,
         superConfig[0].product_code_length + 1
@@ -287,19 +288,22 @@ const dropoutCodes = async (req, res) => {
 
     console.log("Grouping codes by level ", result);
 
-    await processResults(result, tableNamePrefix, dropout_reason, packagingHierarchy);
+    await processResults(result, tableNamePrefix, validationdropout_reason, packagingHierarchy);
 
-    return res.status(ResponseCodes.OK).json({
-      success: true,
-      message: "Scanned codes dropped successfully",
-      code: ResponseCodes.OK,
-    });
+    return handlePrismaSuccess(
+      res, "Scanned codes dropped successfully", 
+    );
+
   } catch (error) {
+      if(error.isJoi === true){
+        return handlePrismaError(
+          res,undefined, error.details[0].message,ResponseCodes.INTERNAL_SERVER_ERROR
+        )
+      }
     console.error("Error in dropout codes :", error);
-    return res.status(ResponseCodes.INTERNAL_SERVER_ERROR).json({
-      message: "Internal server error",
-      error: error.message,
-    });
+    return handlePrismaError(
+      res, undefined, error.details[0].message,ResponseCodes.INTERNAL_SERVER_ERROR
+    );
   }
 };
 
