@@ -16,7 +16,7 @@ const getAllProducts = async (req, res) => {
       ...(search && {
         OR: [
           { product_name: { contains: search, mode: "insensitive" } },
-          { product_id: { contains: search, mode: "insensitive" } },
+          { productId: { contains: search, mode: "insensitive" } },
           { gtin: { contains: search, mode: "insensitive" } },
           { ndc: { contains: search, mode: "insensitive" } },
           { generic_name: { contains: search, mode: "insensitive" } },
@@ -70,8 +70,8 @@ const getAllProducts = async (req, res) => {
 
 const getPackagingHierarchy = async (req, res) => {
   try {
-    const { product_id, currentLevel } = req.body;
-    if (!product_id) {
+    const { productId, currentLevel } = req.body;
+    if (!productId) {
       return handlePrismaError(
         res,
         null,
@@ -80,7 +80,7 @@ const getPackagingHierarchy = async (req, res) => {
       );
     }
     const product = await prisma.product.findFirst({
-      where: { id: product_id },
+      where: { id: productId },
     }); // Ensure 'where' clause is used in Prisma query
     if (!product) {
       return handlePrismaError(
@@ -114,9 +114,9 @@ const getPackagingHierarchy = async (req, res) => {
           packaging_size_value[i] / packaging_size_value[i + 1]
         );
       }
-      const [quantity, packaged] = productLevel;
+      const [quantity, packageNo] = productLevel;
       handlePrismaSuccess(res, "Get successfully", {
-        packaged,
+        packageNo,
         quantity,
         currentLevel: currentLevel,
         totalLevel: product.packagingHierarchy,

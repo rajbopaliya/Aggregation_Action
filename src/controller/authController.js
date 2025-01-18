@@ -8,13 +8,12 @@ import loginSchema from "../validation/authValidation.js";
 const { sign } = pkg;
 
 const login = async (req, res) => {
+  try {
   const validation = await loginSchema.validateAsync(req.body)
     console.log(validation);
-
-  try {
+  
     // Fetch user by userId
-    const user = await findByUserId(validation.user_id);
-
+    const user = await findByUserId(validation.userId);
     if (!user) {
       handlePrismaError(res, undefined, "Invalid username or password",UserResponseCodes.USER_NOT_FOUND );
       return;

@@ -6,4 +6,4 @@ const scanValidationRouter = Router();
 scanValidationRouter.post("/", scanValidation)
 
 
-export default scanValidationRouter
+export default scanValidationRouter 

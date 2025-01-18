@@ -10,17 +10,17 @@ const aggregationtran = async (req, res) => {
     console.log(req.id);
     const { auditlog_username, auditlog_userid } = req;
     console.log(auditlog_username);
-
-    if (!validation.product_id || !validation.batch_id) {
+    
+    if (!validation.productId || !validation.batchId) {
       return handlePrismaError(
-        res,undefined,"Missing required fields: product_id or batch_id", ResponseCodes.BAD_REQUEST
+        res,undefined,"Missing required fields: productId or batchId", ResponseCodes.BAD_REQUEST
       );
     }
 
-    // Fetch generation_id for the provided product_id
+    // Fetch generation_id for the provided productId
     const productGeneration = await prisma.productGenerationId.findFirst({
       where: {
-        product_id: validation.product_id,
+        product_id: validation.productId,
       },
       select: {
         generation_id: true,
@@ -29,7 +29,7 @@ const aggregationtran = async (req, res) => {
 
     if (!productGeneration || !productGeneration.generation_id) {
       return handlePrismaError(
-        res,undefined,"Generation ID not found for the provided product_id",ResponseCodes.NOT_FOUND  
+        res,undefined,"Generation ID not found for the provided productId",ResponseCodes.NOT_FOUND  
       )
     }
 
@@ -38,7 +38,7 @@ const aggregationtran = async (req, res) => {
     // Fetch packaging hierarchy for the product
     const productHistory = await prisma.product_history.findFirst({
       where: {
-        product_uuid: validation.product_id,
+        product_uuid: validation.productId,
       },
       select: {
         packagingHierarchy: true,
@@ -47,7 +47,7 @@ const aggregationtran = async (req, res) => {
 
     if (!productHistory) {
       return handlePrismaError(
-        res, undefined,"Packaging hierarchy not found for the provided product_id",ResponseCodes.NOT_FOUND 
+        res, undefined,"Packaging hierarchy not found for the provided productId",ResponseCodes.NOT_FOUND 
       );
     }
 
@@ -56,7 +56,7 @@ const aggregationtran = async (req, res) => {
     // Fetch product history ID for the batch
     const batchDetails = await prisma.batch.findFirst({
       where: {
-        product_uuid: validation.product_id,
+        product_uuid: validation.productId,
       },
       select: {
         producthistory_uuid: true,
@@ -65,7 +65,7 @@ const aggregationtran = async (req, res) => {
 
     if (!batchDetails) {
       return handlePrismaError(
-        res, undefined,"Batch details not found for the provided product_id",ResponseCodes.NOT_FOUND,
+        res, undefined,"Batch details not found for the provided productId",ResponseCodes.NOT_FOUND,
       );
     }
 
@@ -77,6 +77,8 @@ const aggregationtran = async (req, res) => {
         user_id: req.id
       },
     });
+    console.log("Aaa");
+    
     console.log(existingAggregation);
     if (existingAggregation) {
     console.log("Aggregation transaction already exists in this user");
@@ -87,8 +89,8 @@ const aggregationtran = async (req, res) => {
     // Create a new aggregation transaction
     const updateAggregation = await prisma.aggregation_transaction.create({
       data: {
-        product_id: validation.product_id,
-        batch_id: validation.batch_id,
+        product_id: validation.productId,
+        batch_id: validation.batchId,
         user_id: req.id,
         product_gen_id: productGeneration.generation_id,
         packagingHierarchy: productHistory.packagingHierarchy,
@@ -96,12 +98,11 @@ const aggregationtran = async (req, res) => {
         esign_status:validation.esign_status,
       },
     });
-
     console.log("Aggregation transaction created:", updateAggregation);
     if (validation.audit_log?.audit_log) {
       await logAudit({
-        performed_action: audit_log.performed_action,
-        remarks: audit_log.remarks,
+        performed_action: validation.audit_log.performed_action,
+        remarks: validation.audit_log.remarks,
         user_name: auditlog_username,
         user_id: auditlog_userid,
       });
@@ -111,7 +112,7 @@ const aggregationtran = async (req, res) => {
   } catch (error) {
     if(error.isJoi === true){
       return handlePrismaError (
-        res,undefined, error.details[0].message,ResponseCodes.INTERNAL_SERVER_ERROR
+        res,undefined, error.meta.message ,ResponseCodes.INTERNAL_SERVER_ERROR
       )}
 
     console.log("Error in aggregationtran:", error);    

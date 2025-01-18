@@ -29,5 +29,7 @@ router.use("/api/v1/scanvalidation",verifyAuthentication,scanValidationRouter)
 // dropout 
 router.use("/api/v1/dropout",verifyAuthentication,dropoutRouter)
 
+// reprint
 router.use("/api/v1",verifyAuthentication,reprintRouter);
+
 export default router

@@ -288,13 +288,15 @@ const dropoutCodes = async (req, res) => {
 
     console.log("Grouping codes by level ", result);
 
-    await processResults(result, tableNamePrefix, validationdropout_reason, packagingHierarchy);
+    await processResults(result, tableNamePrefix, validation.dropout_reason, packagingHierarchy);
 
     return handlePrismaSuccess(
       res, "Scanned codes dropped successfully", 
     );
 
   } catch (error) {
+    console.log(error);
+    
       if(error.isJoi === true){
         return handlePrismaError(
           res,undefined, error.details[0].message,ResponseCodes.INTERNAL_SERVER_ERROR
@@ -302,7 +304,7 @@ const dropoutCodes = async (req, res) => {
       }
     console.error("Error in dropout codes :", error);
     return handlePrismaError(
-      res, undefined, error.details[0].message,ResponseCodes.INTERNAL_SERVER_ERROR
+    res,undefined, error.meta.message ,ResponseCodes.INTERNAL_SERVER_ERROR
     );
   }
 };
