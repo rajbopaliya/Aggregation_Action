@@ -1,17 +1,17 @@
 import prisma from "../../DB/db.config.js";
-import codeValid from "../validation/codeScanValidation.js";
+import {codeValid,codeScanValid} from "../validation/codeScanValidation.js";
 import { ResponseCodes } from "../../constant.js";
 import { handlePrismaError,handlePrismaSuccess } from "../services/prismaResponseHandler.js";
 const scanValidation = async (req, res) => {
-  
   try {
   const validation = await codeValid.validateAsync(req.body);
-
   console.log(validation);
+    console.log("AAA");
+    
     console.log("uniqueCode:", validation.uniqueCode);
     console.log("productId:", validation.productId);
     console.log("BatchId", validation.batchId);
-    
+
     //1.
     // Fetch the productCodeLength from superadmin configuration table
     const productConfig = await prisma.superadmin_configuration.findFirst();
@@ -25,6 +25,7 @@ const scanValidation = async (req, res) => {
     console.log("productCodeLength", productConfig.product_code_length);
 
     // Extract the first product_code_length characters from the uniqueCode
+    
     const extractedCode = validation.uniqueCode.substring(0, productConfig.product_code_length);
     console.log("Extracted uniqueCode:", extractedCode);
 
@@ -35,7 +36,6 @@ const scanValidation = async (req, res) => {
       },
     });
     console.log(productDetails);
-
     if (!productDetails) {
       return handlePrismaError(
         res,undefined, "Invalid Product Code",ResponseCodes.NOT_FOUND
@@ -64,7 +64,7 @@ const scanValidation = async (req, res) => {
     console.log("Fetched unique code record:", uniqueCodeRecord);
     console.log(uniqueCodeRecord);
     
-    if (!uniqueCodeRecord) {
+    if (uniqueCodeRecord.length<1) {
       return handlePrismaError(
         res,undefined, "Unique code not found",ResponseCodes.NOT_FOUND
       );
@@ -113,17 +113,13 @@ const scanValidation = async (req, res) => {
       console.log("code scanned done", Scanned);
     }
 
-  // because validation 
-    let validationQuantity = validation.quantity;
-    let validatePackaged = validation.package
-    
-    validationQuantity--;
-    if (validationQuantity == 0) {
-      validatePackaged--
+    validation.quantity--;
+    if ( validation.quantity == 0) {
+      validation.package--
     }
     return handlePrismaSuccess( res,
       "Successfully scanned",
-      { validationQuantity, validatePackaged, currentLevel: validation.packageLevel }
+      { quantity : validation.quantity, package: validation.package, currentLevel: validation.packageLevel }
     );
 
 }catch (error) {
@@ -140,4 +136,105 @@ const scanValidation = async (req, res) => {
   }
 };
 
-export default scanValidation;
+const codeScan = async (req, res) => {
+  try {
+    let validation = await codeScanValid.validateAsync(req.body)
+    console.log(validation);
+    if (validation.currentPackageLevel == 5 && validation.totalProduct == 0) {
+      return handlePrismaSuccess( res,
+        "All code are scanned",null);
+    }
+    const productDetails = await prisma.aggregation_transaction.findFirst({
+      where: {
+        transaction_id: validation.transactionId
+      },
+    });
+
+    const productInfo = await prisma.product.findFirst({ where: { id: productDetails.product_id } });
+    if (!productInfo) {
+      return handlePrismaError(
+        res,undefined,"Product is not found", ResponseCodes.NOT_FOUND
+      );
+    }
+
+    const batchInfo = await prisma.batch.findFirst({ where: { id: productDetails.batch_id } })
+    if (!batchInfo) {
+      return handlePrismaError(
+        res,undefined,"Batch is not found", ResponseCodes.NOT_FOUND
+      );
+    }
+
+    const tableName = `${productDetails.product_gen_id.toLowerCase()}${validation.currentPackageLevel}_codes`
+    console.log(tableName)
+
+    const getTable = await prisma.$queryRawUnsafe(`SELECT * FROM ${tableName} WHERE unique_code = $1`, validation.uniqueCode)
+    if (!getTable[0]) {
+      return handlePrismaError(
+        res,undefined,"unique id of this product is not found at this level", ResponseCodes.NOT_FOUND
+      );
+    }
+    console.log(getTable[0]);
+    console.log("get is Scanned", getTable[0].is_scanned);
+
+    if (getTable[0].is_scanned) {
+      console.log("This code is already scan");
+      return handlePrismaError(
+        res,undefined,"This code is already scan", ResponseCodes.BAD_REQUEST
+      );
+    }
+    else {
+      const Scanned = await prisma.$queryRawUnsafe(`UPDATE ${tableName} SET is_scanned = TRUE WHERE unique_code = $1`, validation.uniqueCode)
+      console.log(Scanned);
+      console.log("code scanned done", Scanned);
+    }
+
+    if (getTable[0].is_aggregated) {
+      return handlePrismaError(
+        res,undefined,"Invalid all ready aggregated", ResponseCodes.BAD_REQUEST
+      );
+    }
+
+    else {
+      const aggregated = await prisma.$queryRawUnsafe(`UPDATE ${tableName} SET is_aggregated = TRUE WHERE unique_code = $1`, validation.uniqueCode)
+      console.log(aggregated);
+      console.log("code aggregated done", aggregated);
+    }
+
+    if (validation.quantity > 0) {
+      validation.quantity--;
+    }
+    validation.totalProduct--;
+    validation.perPackageProduct--;
+    if (validation.packageNo == 0 && validation.totalProduct == 1) {
+      validation.currentPackageLevel = 5
+    }
+    else {
+      if (validation.quantity == 0) {
+        if (validation.perPackageProduct == 0) {
+          validation.currentPackageLevel = 0
+        }
+        else {
+          validation.packageNo--;
+          validation.currentPackageLevel++;
+        }
+      }
+    }
+    return handlePrismaSuccess( res,
+      "Successfully scanned",
+      { packageNo : validation.packageNo, currentPackageLevel: validation.checkPackageLevel, quantity : validation.quantity, perPackageProduct : validation.perPackageProduct, totalLevel:validation.totalLevel, totalProduct : validation.totalProduct }
+    );
+  }
+  catch (error) {
+    
+    if(error.isJoi === true){      
+      return handlePrismaError(
+        res,undefined, error.details[0].message ,ResponseCodes.INTERNAL_SERVER_ERROR
+      )
+   }  
+    console.error("Error in scan:", error.message);
+    return handlePrismaError(
+          res,undefined, error.meta.message ,ResponseCodes.INTERNAL_SERVER_ERROR
+      );
+  }
+}
+export {scanValidation , codeScan};

@@ -8,6 +8,17 @@ const codeValid = Joi.object({
     package: Joi.number().integer().required(),
     quantity: Joi.number().integer().required(),
 })
+
+const codeScanValid = Joi.object({
+    uniqueCode : Joi.string().required(),
+    transactionId : Joi.string().required(),
+    currentPackageLevel : Joi.number().required(),
+    packageNo : Joi.number().required(),
+    quantity : Joi.number().required(),
+    totalLevel : Joi.number().required(),
+    perPackageProduct : Joi.number().required(),
+    totalProduct : Joi.number().required(),
+})
   
 
-export default codeValid
+export {codeValid,codeScanValid}

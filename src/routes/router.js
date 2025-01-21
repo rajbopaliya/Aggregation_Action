@@ -23,7 +23,7 @@ router.use("/api/v1/batch",verifyAuthentication,batchRouter)
 router.use("/api/v1/aggregationtransaction", verifyAuthentication, aggregationTransactionRouter)
 
 // scanValidation
-router.use("/api/v1/scanvalidation",verifyAuthentication,scanValidationRouter)
+router.use("/api/v1/scan",verifyAuthentication,scanValidationRouter)
 
 
 // dropout 
